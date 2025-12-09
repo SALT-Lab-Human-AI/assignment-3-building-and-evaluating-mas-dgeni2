@@ -16,7 +16,16 @@ import yaml
 import logging
 from dotenv import load_dotenv
 
-from src.autogen_orchestrator import AutoGenOrchestrator
+# Try sequential orchestrator first, fall back to AutoGen
+try:
+    from src.orchestrator import Orchestrator
+    ORCHESTRATOR_TYPE = "sequential"
+except ImportError:
+    try:
+        from src.autogen_orchestrator import AutoGenOrchestrator
+        ORCHESTRATOR_TYPE = "autogen"
+    except ImportError:
+        ORCHESTRATOR_TYPE = None
 
 # Load environment variables
 load_dotenv()
@@ -24,14 +33,14 @@ load_dotenv()
 class CLI:
     """
     Command-line interface for the research assistant.
-
-    TODO: YOUR CODE HERE
-    - Implement interactive prompt loop
-    - Display agent traces clearly
-    - Show citations and sources
-    - Indicate safety events (blocked/sanitized)
-    - Handle user commands (help, quit, clear, etc.)
-    - Format output nicely
+    
+    Features:
+    - Interactive prompt loop
+    - Clear agent trace display
+    - Citation and source display
+    - Safety event indicators
+    - User commands (help, quit, clear, stats, traces)
+    - Formatted output
     """
 
     def __init__(self, config_path: str = "config.yaml"):
@@ -48,11 +57,18 @@ class CLI:
         # Setup logging
         self._setup_logging()
 
-        # Initialize AutoGen orchestrator
+        # Initialize orchestrator
         try:
-            self.orchestrator = AutoGenOrchestrator(self.config)
-            self.logger = logging.getLogger("cli")
-            self.logger.info("AutoGen orchestrator initialized successfully")
+            if ORCHESTRATOR_TYPE == "sequential":
+                self.orchestrator = Orchestrator(self.config)
+                self.logger = logging.getLogger("cli")
+                self.logger.info("Sequential orchestrator initialized successfully")
+            elif ORCHESTRATOR_TYPE == "autogen":
+                self.orchestrator = AutoGenOrchestrator(self.config)
+                self.logger = logging.getLogger("cli")
+                self.logger.info("AutoGen orchestrator initialized successfully")
+            else:
+                raise ImportError("No orchestrator available")
         except Exception as e:
             self.logger = logging.getLogger("cli")
             self.logger.error(f"Failed to initialize orchestrator: {e}")
@@ -60,6 +76,8 @@ class CLI:
 
         self.running = True
         self.query_count = 0
+        self.show_traces = False
+        self.show_safety = True
 
     def _setup_logging(self):
         """Setup logging configuration."""
@@ -78,20 +96,13 @@ class CLI:
     async def run(self):
         """
         Main CLI loop.
-
-        TODO: YOUR CODE HERE
-        - Implement interactive loop
-        - Handle user input
-        - Process queries through orchestrator
-        - Display results
-        - Handle errors gracefully
         """
         self._print_welcome()
 
         while self.running:
             try:
                 # Get user input
-                query = input("\nEnter your research query (or 'help' for commands): ").strip()
+                query = input("\n🔍 Enter your research query (or 'help' for commands): ").strip()
 
                 if not query:
                     continue
@@ -109,14 +120,22 @@ class CLI:
                 elif query.lower() == 'stats':
                     self._print_stats()
                     continue
+                elif query.lower() == 'traces':
+                    self.show_traces = not self.show_traces
+                    print(f"\n{'✓' if self.show_traces else '✗'} Agent traces: {'ON' if self.show_traces else 'OFF'}")
+                    continue
+                elif query.lower() == 'safety':
+                    self.show_safety = not self.show_safety
+                    print(f"\n{'✓' if self.show_safety else '✗'} Safety events: {'ON' if self.show_safety else 'OFF'}")
+                    continue
 
                 # Process query
                 print("\n" + "=" * 70)
-                print("Processing your query...")
+                print("⏳ Processing your query...")
                 print("=" * 70)
                 
                 try:
-                    # Process through orchestrator (synchronous call, not async)
+                    # Process through orchestrator (synchronous call)
                     result = self.orchestrator.process_query(query)
                     self.query_count += 1
                     
@@ -124,39 +143,47 @@ class CLI:
                     self._display_result(result)
                     
                 except Exception as e:
-                    print(f"\nError processing query: {e}")
+                    print(f"\n❌ Error processing query: {e}")
                     logging.exception("Error processing query")
 
             except KeyboardInterrupt:
-                print("\n\nInterrupted by user.")
+                print("\n\n⚠️  Interrupted by user.")
                 self._print_goodbye()
                 break
             except Exception as e:
-                print(f"\nError: {e}")
+                print(f"\n❌ Error: {e}")
                 logging.exception("Error in CLI loop")
 
     def _print_welcome(self):
         """Print welcome message."""
         print("=" * 70)
-        print(f"  {self.config['system']['name']}")
-        print(f"  Topic: {self.config['system']['topic']}")
+        print(f"  🤖 {self.config['system']['name']}")
+        print(f"  📚 Topic: {self.config['system']['topic']}")
         print("=" * 70)
         print("\nWelcome! Ask me anything about your research topic.")
         print("Type 'help' for available commands, or 'quit' to exit.\n")
 
     def _print_help(self):
         """Print help message."""
-        print("\nAvailable commands:")
-        print("  help    - Show this help message")
-        print("  clear   - Clear the screen")
-        print("  stats   - Show system statistics")
-        print("  quit    - Exit the application")
-        print("\nOr enter a research query to get started!")
+        print("\n" + "=" * 70)
+        print("📖 AVAILABLE COMMANDS")
+        print("=" * 70)
+        print("  help     - Show this help message")
+        print("  clear    - Clear the screen")
+        print("  stats    - Show system statistics")
+        print("  traces   - Toggle agent trace display")
+        print("  safety   - Toggle safety event display")
+        print("  quit     - Exit the application")
+        print("\n" + "=" * 70)
+        print("💡 TIP: Enter a research query to get started!")
+        print("=" * 70)
 
     def _print_goodbye(self):
         """Print goodbye message."""
-        print("\nThank you for using the Multi-Agent Research Assistant!")
-        print("Goodbye!\n")
+        print("\n" + "=" * 70)
+        print("👋 Thank you for using the Multi-Agent Research Assistant!")
+        print(f"📊 Processed {self.query_count} query/queries")
+        print("=" * 70 + "\n")
 
     def _clear_screen(self):
         """Clear the terminal screen."""
@@ -165,16 +192,21 @@ class CLI:
 
     def _print_stats(self):
         """Print system statistics."""
-        print("\nSystem Statistics:")
+        print("\n" + "=" * 70)
+        print("📊 SYSTEM STATISTICS")
+        print("=" * 70)
         print(f"  Queries processed: {self.query_count}")
         print(f"  System: {self.config.get('system', {}).get('name', 'Unknown')}")
         print(f"  Topic: {self.config.get('system', {}).get('topic', 'Unknown')}")
         print(f"  Model: {self.config.get('models', {}).get('default', {}).get('name', 'Unknown')}")
+        print(f"  Provider: {self.config.get('models', {}).get('default', {}).get('provider', 'Unknown')}")
+        print(f"  Orchestrator: {ORCHESTRATOR_TYPE}")
+        print("=" * 70)
 
     def _display_result(self, result: Dict[str, Any]):
         """Display query result with formatting."""
         print("\n" + "=" * 70)
-        print("RESPONSE")
+        print("📝 RESPONSE")
         print("=" * 70)
 
         # Check for errors
@@ -182,76 +214,133 @@ class CLI:
             print(f"\n❌ Error: {result['error']}")
             return
 
+        # Check for safety violations
+        metadata = result.get("metadata", {})
+        if metadata.get("safety_violation"):
+            print("\n⚠️  SAFETY ALERT")
+            print("-" * 70)
+            violations = metadata.get("violations", [])
+            for violation in violations:
+                reason = violation.get("reason", "Unknown violation")
+                severity = violation.get("severity", "unknown")
+                print(f"  [{severity.upper()}] {reason}")
+            print("-" * 70 + "\n")
+
         # Display response
         response = result.get("response", "")
         print(f"\n{response}\n")
 
-        # Extract and display citations from conversation
-        citations = self._extract_citations(result)
-        if citations:
+        # Display citations and sources
+        citations = metadata.get("citations", [])
+        sources = metadata.get("sources", [])
+        
+        if citations or sources:
             print("\n" + "-" * 70)
-            print("📚 CITATIONS")
+            print("📚 SOURCES & CITATIONS")
             print("-" * 70)
-            for i, citation in enumerate(citations, 1):
-                print(f"[{i}] {citation}")
+            
+            # Display citations
+            if citations:
+                print("\nCitations:")
+                for i, citation in enumerate(citations[:10], 1):
+                    print(f"  [{i}] {citation}")
+            
+            # Display sources
+            if sources:
+                print("\nSources:")
+                for i, source in enumerate(sources[:10], 1):
+                    title = source.get("title", "Unknown")
+                    url = source.get("url", "")
+                    if url:
+                        print(f"  [{i}] {title}")
+                        print(f"      🔗 {url}")
+                    else:
+                        print(f"  [{i}] {title}")
 
         # Display metadata
-        metadata = result.get("metadata", {})
         if metadata:
             print("\n" + "-" * 70)
             print("📊 METADATA")
             print("-" * 70)
-            print(f"  • Messages exchanged: {metadata.get('num_messages', 0)}")
-            print(f"  • Sources gathered: {metadata.get('num_sources', 0)}")
-            print(f"  • Agents involved: {', '.join(metadata.get('agents_involved', []))}")
+            
+            # Check orchestrator type for metadata structure
+            if ORCHESTRATOR_TYPE == "sequential":
+                print(f"  • Iterations: {metadata.get('iterations', 0)}")
+                print(f"  • Sources gathered: {metadata.get('num_sources', 0)}")
+                print(f"  • Citations: {len(citations)}")
+                print(f"  • Elapsed time: {metadata.get('elapsed_time', 0):.2f}s")
+                print(f"  • Status: {metadata.get('status', 'unknown')}")
+            else:
+                print(f"  • Messages exchanged: {metadata.get('num_messages', 0)}")
+                print(f"  • Sources gathered: {metadata.get('num_sources', 0)}")
+                print(f"  • Agents involved: {', '.join(metadata.get('agents_involved', []))}")
 
-        # Display conversation summary if verbose mode
-        if self._should_show_traces():
-            self._display_conversation_summary(result.get("conversation_history", []))
+        # Display workflow trace if enabled
+        if self.show_traces:
+            self._display_workflow_trace(result)
 
         print("=" * 70 + "\n")
     
-    def _extract_citations(self, result: Dict[str, Any]) -> list:
-        """Extract citations/URLs from conversation history."""
-        citations = []
-        
-        for msg in result.get("conversation_history", []):
-            content = msg.get("content", "")
-            
-            # Find URLs in content
-            import re
-            urls = re.findall(r'https?://[^\s<>"{}|\\^`\[\]]+', content)
-            
-            for url in urls:
-                if url not in citations:
-                    citations.append(url)
-        
-        return citations[:10]  # Limit to top 10
-
-    def _should_show_traces(self) -> bool:
-        """Check if agent traces should be displayed."""
-        # Check config for verbose mode
-        return self.config.get("ui", {}).get("verbose", False)
-
-    def _display_conversation_summary(self, conversation_history: list):
-        """Display a summary of the agent conversation."""
-        if not conversation_history:
-            return
-            
+    def _display_workflow_trace(self, result: Dict[str, Any]):
+        """Display workflow trace."""
         print("\n" + "-" * 70)
-        print("🔍 CONVERSATION SUMMARY")
+        print("🔍 WORKFLOW TRACE")
         print("-" * 70)
         
-        for i, msg in enumerate(conversation_history, 1):
-            agent = msg.get("source", "Unknown")
+        # Check orchestrator type for trace structure
+        if ORCHESTRATOR_TYPE == "sequential":
+            workflow_trace = result.get("workflow_trace", [])
+            if workflow_trace:
+                for i, entry in enumerate(workflow_trace, 1):
+                    phase = entry.get("phase", "unknown").upper()
+                    message = entry.get("message", "")
+                    data = entry.get("data", {})
+                    
+                    print(f"\n{i}. [{phase}] {message}")
+                    if data:
+                        for key, value in data.items():
+                            if isinstance(value, str) and len(value) > 100:
+                                value = value[:100] + "..."
+                            print(f"   • {key}: {value}")
+            else:
+                print("\n  No workflow trace available")
+        else:
+            # AutoGen orchestrator - use conversation history
+            conversation_history = result.get("conversation_history", [])
+            if conversation_history:
+                print("\nAgent Conversation:")
+                for i, msg in enumerate(conversation_history, 1):
+                    agent = msg.get("source", "Unknown")
+                    content = msg.get("content", "")
+                    preview = content[:200] + "..." if len(content) > 200 else content
+                    preview = preview.replace("\n", " ")
+                    print(f"\n{i}. [{agent}]")
+                    print(f"   {preview}")
+            else:
+                print("\n  No conversation history available")
+
+    def _extract_citations(self, result: Dict[str, Any]) -> list:
+        """Extract citations/URLs from result."""
+        citations = []
+        metadata = result.get("metadata", {})
+        
+        # Get citations from metadata
+        citations.extend(metadata.get("citations", []))
+        
+        # Extract URLs from response and conversation history
+        import re
+        response = result.get("response", "")
+        urls = re.findall(r'https?://[^\s<>"{}|\\^`\[\]]+', response)
+        citations.extend(urls)
+        
+        # Extract from conversation history if available
+        for msg in result.get("conversation_history", []):
             content = msg.get("content", "")
-            
-            # Truncate long content
-            preview = content[:150] + "..." if len(content) > 150 else content
-            preview = preview.replace("\n", " ")
-            
-            print(f"\n{i}. {agent}:")
-            print(f"   {preview}")
+            urls = re.findall(r'https?://[^\s<>"{}|\\^`\[\]]+', content)
+            citations.extend(urls)
+        
+        # Deduplicate
+        return list(dict.fromkeys(citations))[:10]  # Limit to top 10
 
 
 def main():

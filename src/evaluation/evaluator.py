@@ -135,21 +135,34 @@ class SystemEvaluator:
         # Run through orchestrator if available
         if self.orchestrator:
             try:
-                # Call orchestrator's process_query method
-                # TODO: YOUR CODE HERE
-                # Need to implement this in their orchestrator
+                # Call orchestrator's process_query method (synchronous)
                 response_data = self.orchestrator.process_query(query)
                 
-                # If process_query is async, use:
-                # response_data = await self.orchestrator.process_query(query)
+                # Extract response and metadata
+                if isinstance(response_data, dict):
+                    # Ensure we have the expected structure
+                    if "response" not in response_data:
+                        response_data["response"] = response_data.get("output", "")
+                    
+                    # Extract sources from metadata
+                    metadata = response_data.get("metadata", {})
+                    sources = metadata.get("sources", [])
+                    citations = metadata.get("citations", [])
+                    
+                    # If sources not in metadata, try to extract from response
+                    if not sources and citations:
+                        sources = [{"title": cit, "type": "citation"} for cit in citations[:10]]
+                    
+                    response_data["metadata"]["sources"] = sources
+                    response_data["citations"] = citations
                 
             except Exception as e:
-                self.logger.error(f"Error processing query through orchestrator: {e}")
+                self.logger.error(f"Error processing query through orchestrator: {e}", exc_info=True)
                 response_data = {
                     "query": query,
                     "response": f"Error: {str(e)}",
                     "citations": [],
-                    "metadata": {"error": str(e)}
+                    "metadata": {"error": str(e), "sources": []}
                 }
         else:
             # Placeholder for testing without orchestrator
@@ -242,6 +255,37 @@ class SystemEvaluator:
         # Find best and worst
         best_result = max(successful, key=lambda r: r.get("evaluation", {}).get("overall_score", 0.0)) if successful else None
         worst_result = min(successful, key=lambda r: r.get("evaluation", {}).get("overall_score", 0.0)) if successful else None
+        
+        # Calculate score distribution
+        score_ranges = {
+            "excellent (0.9-1.0)": sum(1 for s in overall_scores if s >= 0.9),
+            "good (0.7-0.9)": sum(1 for s in overall_scores if 0.7 <= s < 0.9),
+            "average (0.5-0.7)": sum(1 for s in overall_scores if 0.5 <= s < 0.7),
+            "below_average (0.3-0.5)": sum(1 for s in overall_scores if 0.3 <= s < 0.5),
+            "poor (0.0-0.3)": sum(1 for s in overall_scores if s < 0.3)
+        }
+        
+        # Calculate standard deviation
+        import statistics
+        score_std = statistics.stdev(overall_scores) if len(overall_scores) > 1 else 0.0
+        
+        # Analyze errors
+        error_analysis = []
+        for result in failed:
+            error_analysis.append({
+                "query": result.get("query", ""),
+                "error": result.get("error", "Unknown error")
+            })
+        
+        # Criterion analysis (which criteria are strongest/weakest)
+        criterion_analysis = {}
+        for criterion, scores in criterion_scores.items():
+            criterion_analysis[criterion] = {
+                "average": sum(scores) / len(scores) if scores else 0.0,
+                "min": min(scores) if scores else 0.0,
+                "max": max(scores) if scores else 0.0,
+                "std": statistics.stdev(scores) if len(scores) > 1 else 0.0
+            }
 
         report = {
             "timestamp": datetime.now().isoformat(),
@@ -253,16 +297,24 @@ class SystemEvaluator:
             },
             "scores": {
                 "overall_average": avg_overall,
-                "by_criterion": avg_criterion_scores
+                "overall_std": score_std,
+                "overall_min": min(overall_scores) if overall_scores else 0.0,
+                "overall_max": max(overall_scores) if overall_scores else 0.0,
+                "by_criterion": avg_criterion_scores,
+                "criterion_analysis": criterion_analysis,
+                "distribution": score_ranges
             },
             "best_result": {
                 "query": best_result.get("query", "") if best_result else "",
-                "score": best_result.get("evaluation", {}).get("overall_score", 0.0) if best_result else 0.0
+                "score": best_result.get("evaluation", {}).get("overall_score", 0.0) if best_result else 0.0,
+                "criterion_scores": best_result.get("evaluation", {}).get("criterion_scores", {}) if best_result else {}
             } if best_result else None,
             "worst_result": {
                 "query": worst_result.get("query", "") if worst_result else "",
-                "score": worst_result.get("evaluation", {}).get("overall_score", 0.0) if worst_result else 0.0
+                "score": worst_result.get("evaluation", {}).get("overall_score", 0.0) if worst_result else 0.0,
+                "criterion_scores": worst_result.get("evaluation", {}).get("criterion_scores", {}) if worst_result else {}
             } if worst_result else None,
+            "error_analysis": error_analysis,
             "detailed_results": self.results
         }
 
@@ -294,19 +346,63 @@ class SystemEvaluator:
         with open(summary_file, 'w') as f:
             f.write("EVALUATION SUMMARY\n")
             f.write("=" * 70 + "\n\n")
+            f.write(f"Evaluation Date: {report.get('timestamp', 'Unknown')}\n\n")
 
             summary = report.get("summary", {})
+            f.write("SUMMARY STATISTICS\n")
+            f.write("-" * 70 + "\n")
             f.write(f"Total Queries: {summary.get('total_queries', 0)}\n")
             f.write(f"Successful: {summary.get('successful', 0)}\n")
             f.write(f"Failed: {summary.get('failed', 0)}\n")
             f.write(f"Success Rate: {summary.get('success_rate', 0.0):.2%}\n\n")
 
             scores = report.get("scores", {})
-            f.write(f"Overall Average Score: {scores.get('overall_average', 0.0):.3f}\n\n")
+            f.write("OVERALL SCORES\n")
+            f.write("-" * 70 + "\n")
+            f.write(f"Average Score: {scores.get('overall_average', 0.0):.3f}\n")
+            f.write(f"Standard Deviation: {scores.get('overall_std', 0.0):.3f}\n")
+            f.write(f"Min Score: {scores.get('overall_min', 0.0):.3f}\n")
+            f.write(f"Max Score: {scores.get('overall_max', 0.0):.3f}\n\n")
 
-            f.write("Scores by Criterion:\n")
+            f.write("SCORES BY CRITERION\n")
+            f.write("-" * 70 + "\n")
             for criterion, score in scores.get("by_criterion", {}).items():
-                f.write(f"  {criterion}: {score:.3f}\n")
+                analysis = scores.get("criterion_analysis", {}).get(criterion, {})
+                f.write(f"{criterion}:\n")
+                f.write(f"  Average: {score:.3f}\n")
+                f.write(f"  Range: {analysis.get('min', 0.0):.3f} - {analysis.get('max', 0.0):.3f}\n")
+                f.write(f"  Std Dev: {analysis.get('std', 0.0):.3f}\n\n")
+
+            f.write("SCORE DISTRIBUTION\n")
+            f.write("-" * 70 + "\n")
+            distribution = scores.get("distribution", {})
+            for range_name, count in distribution.items():
+                f.write(f"{range_name}: {count}\n")
+            f.write("\n")
+
+            # Best and worst results
+            best = report.get("best_result")
+            worst = report.get("worst_result")
+            if best:
+                f.write("BEST RESULT\n")
+                f.write("-" * 70 + "\n")
+                f.write(f"Query: {best.get('query', '')}\n")
+                f.write(f"Score: {best.get('score', 0.0):.3f}\n\n")
+            
+            if worst:
+                f.write("WORST RESULT\n")
+                f.write("-" * 70 + "\n")
+                f.write(f"Query: {worst.get('query', '')}\n")
+                f.write(f"Score: {worst.get('score', 0.0):.3f}\n\n")
+            
+            # Error analysis
+            errors = report.get("error_analysis", [])
+            if errors:
+                f.write("ERROR ANALYSIS\n")
+                f.write("-" * 70 + "\n")
+                for error in errors:
+                    f.write(f"Query: {error.get('query', '')}\n")
+                    f.write(f"Error: {error.get('error', '')}\n\n")
 
         self.logger.info(f"Summary saved to {summary_file}")
 
@@ -405,8 +501,8 @@ async def example_simple_evaluation():
     test_file.unlink()
 
 
-async def example_with_orchestrator():
-    """
+    async def example_with_orchestrator():
+        """
     Example 2: Evaluation with orchestrator
     Shows how to connect the evaluator to your multi-agent system
     
@@ -428,17 +524,22 @@ async def example_with_orchestrator():
     with open("config.yaml", 'r') as f:
         config = yaml.safe_load(f)
     
-    # Initialize orchestrator
-    # TODO: YOUR CODE HERE
-    # Replace this with their actual orchestrator
+    # Initialize orchestrator (try sequential first, then AutoGen)
+    orchestrator = None
     try:
-        from src.autogen_orchestrator import AutoGenOrchestrator
-        orchestrator = AutoGenOrchestrator(config)
-        print("\nOrchestrator initialized successfully")
+        from src.orchestrator import Orchestrator
+        orchestrator = Orchestrator(config)
+        print("\nSequential orchestrator initialized successfully")
     except Exception as e:
-        print(f"\nCould not initialize orchestrator: {e}")
-        print("This example requires a working orchestrator implementation")
-        return
+        print(f"\nCould not initialize sequential orchestrator: {e}")
+        try:
+            from src.autogen_orchestrator import AutoGenOrchestrator
+            orchestrator = AutoGenOrchestrator(config)
+            print("AutoGen orchestrator initialized successfully")
+        except Exception as e2:
+            print(f"Could not initialize AutoGen orchestrator: {e2}")
+            print("This example requires a working orchestrator implementation")
+            return
     
     # Create test queries
     test_queries = [

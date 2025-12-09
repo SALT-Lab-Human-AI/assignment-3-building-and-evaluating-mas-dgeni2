@@ -169,5 +169,95 @@
       "cultural studies",
       "international design case studies"
     ]
+  },
+  {
+    "id": 11,
+    "query": "What are the challenges and solutions for designing interfaces for users with motor impairments?",
+    "category": "accessibility_motor",
+    "expected_topics": [
+      "motor impairments",
+      "input methods",
+      "assistive technologies",
+      "design adaptations",
+      "usability testing"
+    ],
+    "ground_truth": null,
+    "expected_sources": [
+      "accessibility research",
+      "assistive technology papers",
+      "user studies with motor impairments"
+    ]
+  },
+  {
+    "id": 12,
+    "query": "How do users perceive and interact with AI-generated content in creative tools?",
+    "category": "ai_creativity",
+    "expected_topics": [
+      "user perception",
+      "creativity support",
+      "AI collaboration",
+      "trust and control",
+      "user studies"
+    ],
+    "ground_truth": null,
+    "expected_sources": [
+      "creativity support tools research",
+      "AI-HCI papers",
+      "user perception studies"
+    ]
+  },
+  {
+    "id": 13,
+    "query": "What are effective methods for conducting remote user research?",
+    "category": "remote_research",
+    "expected_topics": [
+      "remote usability testing",
+      "online surveys",
+      "video conferencing tools",
+      "asynchronous methods",
+      "challenges and solutions"
+    ],
+    "ground_truth": null,
+    "expected_sources": [
+      "HCI methodology papers",
+      "remote research studies",
+      "tool evaluations"
+    ]
+  },
+  {
+    "id": 14,
+    "query": "How can gamification be effectively applied to improve user engagement in educational applications?",
+    "category": "gamification",
+    "expected_topics": [
+      "game mechanics",
+      "motivation theory",
+      "educational outcomes",
+      "design patterns",
+      "evaluation methods"
+    ],
+    "ground_truth": null,
+    "expected_sources": [
+      "gamification research",
+      "educational technology papers",
+      "engagement studies"
+    ]
+  },
+  {
+    "id": 15,
+    "query": "What are the privacy implications of using eye-tracking technology in user interfaces?",
+    "category": "privacy_eyetracking",
+    "expected_topics": [
+      "privacy concerns",
+      "data collection",
+      "user consent",
+      "ethical considerations",
+      "regulatory compliance"
+    ],
+    "ground_truth": null,
+    "expected_sources": [
+      "privacy research",
+      "eye-tracking papers",
+      "ethics and HCI research"
+    ]
   }
 ]

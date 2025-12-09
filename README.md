@@ -192,15 +192,15 @@ This template provides the structure - you need to implement the core functional
 ### Phase 1: Core Agent Implementation
 
 1. **Implement Agent Logic** (in `src/agents/`)
-   - [ ] Complete `planner_agent.py` - Integrate LLM to break down queries
-   - [ ] Complete `researcher_agent.py` - Integrate search APIs (Tavily, Semantic Scholar)
+   - [x] Complete `planner_agent.py` - Integrate LLM to break down queries
+   - [x] Complete `researcher_agent.py` - Integrate search APIs (Tavily, Semantic Scholar)
    - [ ] Complete `critic_agent.py` - Implement quality evaluation logic
-   - [ ] Complete `writer_agent.py` - Implement synthesis with proper citations
+   - [x] Complete `writer_agent.py` - Implement synthesis with proper citations
 
 2. **Implement Tools** (in `src/tools/`)
-   - [ ] Complete `web_search.py` - Integrate Tavily or Brave API
-   - [ ] Complete `paper_search.py` - Integrate Semantic Scholar API
-   - [ ] Complete `citation_tool.py` - Implement APA citation formatting
+   - [x] Complete `web_search.py` - Integrate Tavily or Brave API
+   - [x] Complete `paper_search.py` - Integrate Semantic Scholar API
+   - [x] Complete `citation_tool.py` - Implement APA citation formatting
 
 ### Phase 2: Orchestration
 
@@ -208,9 +208,9 @@ Choose your preferred framework to implement the multi-agent system. The current
 
 
 3. **Update `orchestrator.py`**
-   - Integrate your chosen framework
-   - Implement the workflow: plan → research → write → critique → revise
-   - Add error handling
+   - [x] Integrate your chosen framework
+   - [x] Implement the workflow: plan → research → write → critique → revise
+   - [ ] Add error handling
 
 ### Phase 3: Safety Guardrails
 
@@ -236,10 +236,10 @@ Choose your preferred framework to implement the multi-agent system. The current
 ### Phase 5: User Interface
 
 7. **Complete UI** (choose one or both)
-   - [ ] Finish CLI implementation in `src/ui/cli.py`
-   - [ ] Finish web UI in `src/ui/streamlit_app.py`
-   - [ ] Display agent traces clearly
-   - [ ] Show citations and sources
+   - [x] Finish CLI implementation in `src/ui/cli.py`
+   - [x] Finish web UI in `src/ui/streamlit_app.py`
+   - [x] Display agent traces clearly
+   - [x] Show citations and sources
    - [ ] Indicate safety events
 
 ## Running the System

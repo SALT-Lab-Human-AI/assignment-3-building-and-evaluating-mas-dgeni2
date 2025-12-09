@@ -31,7 +31,8 @@ async def run_evaluation():
     """Run system evaluation."""
     import yaml
     from dotenv import load_dotenv
-    from src.autogen_orchestrator import AutoGenOrchestrator
+    from src.orchestrator import Orchestrator
+    from src.evaluation.evaluator import SystemEvaluator
     
     # Load environment variables
     load_dotenv()
@@ -40,31 +41,56 @@ async def run_evaluation():
     with open("config.yaml", 'r') as f:
         config = yaml.safe_load(f)
 
-    # Initialize AutoGen orchestrator
-    print("Initializing AutoGen orchestrator...")
-    orchestrator = AutoGenOrchestrator(config)
+    # Initialize sequential orchestrator
+    print("Initializing sequential orchestrator...")
+    orchestrator = Orchestrator(config)
     
-    # For now, run a simple test query
-    # TODO: Integrate with SystemEvaluator for full evaluation
+    # Initialize evaluator
+    print("Initializing system evaluator...")
+    evaluator = SystemEvaluator(config, orchestrator=orchestrator)
+    
+    # Print workflow visualization
     print("\n" + "=" * 70)
-    print("RUNNING TEST QUERY")
+    print("SYSTEM WORKFLOW")
+    print("=" * 70)
+    print(orchestrator.visualize_workflow())
+    
+    # Run full evaluation
+    print("\n" + "=" * 70)
+    print("RUNNING FULL EVALUATION")
+    print("=" * 70)
+    print("\nThis will evaluate the system on test queries from data/example_queries.json")
+    print("Evaluation may take several minutes depending on the number of queries...\n")
+    
+    # Run evaluation
+    report = await evaluator.evaluate_system("data/example_queries.json")
+    
+    # Display results summary
+    print("\n" + "=" * 70)
+    print("EVALUATION RESULTS SUMMARY")
     print("=" * 70)
     
-    test_query = "What are the key principles of accessible user interface design?"
-    print(f"\nQuery: {test_query}\n")
+    summary = report.get("summary", {})
+    print(f"\nTotal Queries: {summary.get('total_queries', 0)}")
+    print(f"Successful: {summary.get('successful', 0)}")
+    print(f"Failed: {summary.get('failed', 0)}")
+    print(f"Success Rate: {summary.get('success_rate', 0.0):.2%}")
     
-    result = orchestrator.process_query(test_query)
+    scores = report.get("scores", {})
+    print(f"\nOverall Average Score: {scores.get('overall_average', 0.0):.3f}")
+    print(f"Score Range: {scores.get('overall_min', 0.0):.3f} - {scores.get('overall_max', 0.0):.3f}")
+    print(f"Standard Deviation: {scores.get('overall_std', 0.0):.3f}")
     
-    print("\n" + "=" * 70)
-    print("RESULTS")
-    print("=" * 70)
-    print(f"\nResponse:\n{result.get('response', 'No response generated')}")
-    print(f"\nMetadata:")
-    print(f"  - Messages: {result.get('metadata', {}).get('num_messages', 0)}")
-    print(f"  - Sources: {result.get('metadata', {}).get('num_sources', 0)}")
+    print("\nScores by Criterion:")
+    for criterion, score in scores.get("by_criterion", {}).items():
+        print(f"  {criterion}: {score:.3f}")
     
-    print("\n" + "=" * 70)
-    print("Note: Full evaluation with SystemEvaluator can be implemented")
+    print("\nScore Distribution:")
+    distribution = scores.get("distribution", {})
+    for range_name, count in distribution.items():
+        print(f"  {range_name}: {count}")
+    
+    print(f"\nDetailed results saved to outputs/")
     print("=" * 70)
 
 
@@ -75,6 +101,54 @@ def run_autogen():
     subprocess.run([sys.executable, "example_autogen.py"])
 
 
+def run_sequential():
+    """Run sequential orchestrator test."""
+    import yaml
+    from dotenv import load_dotenv
+    from src.orchestrator import Orchestrator
+    
+    # Load environment variables
+    load_dotenv()
+
+    # Load config
+    with open("config.yaml", 'r') as f:
+        config = yaml.safe_load(f)
+
+    # Initialize sequential orchestrator
+    print("Initializing sequential orchestrator...")
+    orchestrator = Orchestrator(config)
+    
+    # Print workflow visualization
+    print(orchestrator.visualize_workflow())
+    
+    # Example query
+    query = "What are the latest trends in human-computer interaction research?"
+    
+    print(f"\nProcessing query: {query}\n")
+    print("=" * 70)
+    
+    # Process query
+    result = orchestrator.process_query(query)
+    
+    # Display results
+    print("\n" + "=" * 70)
+    print("RESULTS")
+    print("=" * 70)
+    print(f"\nQuery: {result['query']}")
+    print(f"\nResponse:\n{result['response']}")
+    print(f"\nMetadata:")
+    print(f"  - Iterations: {result['metadata']['iterations']}")
+    print(f"  - Sources: {result['metadata']['num_sources']}")
+    print(f"  - Citations: {len(result['metadata'].get('citations', []))}")
+    print(f"  - Elapsed time: {result['metadata']['elapsed_time']:.2f}s")
+    
+    # Print workflow trace
+    print("\n" + "=" * 70)
+    print("WORKFLOW TRACE")
+    print("=" * 70)
+    print(orchestrator.get_workflow_trace_summary())
+
+
 def main():
     """Main entry point."""
     parser = argparse.ArgumentParser(
@@ -82,9 +156,9 @@ def main():
     )
     parser.add_argument(
         "--mode",
-        choices=["cli", "web", "evaluate", "autogen"],
+        choices=["cli", "web", "evaluate", "autogen", "sequential"],
         default="autogen",
-        help="Mode to run: cli, web, evaluate, or autogen (default)"
+        help="Mode to run: cli, web, evaluate, autogen, or sequential"
     )
     parser.add_argument(
         "--config",
@@ -102,6 +176,8 @@ def main():
         asyncio.run(run_evaluation())
     elif args.mode == "autogen":
         run_autogen()
+    elif args.mode == "sequential":
+        run_sequential()
 
 
 if __name__ == "__main__":

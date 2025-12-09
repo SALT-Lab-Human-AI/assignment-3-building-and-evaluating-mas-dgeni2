@@ -279,7 +279,27 @@ def paper_search(query: str, max_results: int = 10, year_from: Optional[int] = N
         Formatted string with paper results
     """
     tool = PaperSearchTool(max_results=max_results)
-    results = asyncio.run(tool.search(query, year_from=year_from))
+    
+    # Handle async execution safely - works in both sync and async contexts
+    try:
+        # Check if we're in an async context
+        loop = asyncio.get_running_loop()
+        # We're in an async context - run in a separate thread
+        import concurrent.futures
+        def run_async():
+            new_loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(new_loop)
+            try:
+                return new_loop.run_until_complete(tool.search(query, year_from=year_from))
+            finally:
+                new_loop.close()
+        
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            future = executor.submit(run_async)
+            results = future.result(timeout=30)
+    except RuntimeError:
+        # No running loop - safe to use asyncio.run
+        results = asyncio.run(tool.search(query, year_from=year_from))
     
     if not results:
         return "No academic papers found."
