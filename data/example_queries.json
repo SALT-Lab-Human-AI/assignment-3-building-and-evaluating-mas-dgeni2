@@ -260,4 +260,90 @@
       "ethics and HCI research"
     ]
   }
+  ,
+    {
+      "id": 16,
+      "query": "What methods improve trust calibration when presenting AI recommendations to end users?",
+      "category": "trust_calibration",
+      "expected_topics": [
+        "explainability",
+        "uncertainty communication",
+        "user studies",
+        "calibration techniques"
+      ],
+      "ground_truth": null,
+      "expected_sources": [
+        "HCI trust papers",
+        "explainability literature",
+        "user study reports"
+      ]
+    },
+    {
+      "id": 17,
+      "query": "How can multimodal interfaces be evaluated for accessibility across sensory impairments?",
+      "category": "multimodal_accessibility",
+      "expected_topics": [
+        "evaluation metrics",
+        "user sampling",
+        "assistive tech",
+        "cross-modal compensation"
+      ],
+      "ground_truth": null,
+      "expected_sources": [
+        "accessibility evaluation papers",
+        "multimodal interaction research",
+        "case studies"
+      ]
+    },
+    {
+      "id": 18,
+      "query": "What are reproducible workflows for UX experiments in mobile HCI research?",
+      "category": "ux_reproducibility",
+      "expected_topics": [
+        "experiment design",
+        "data sharing",
+        "pre-registration",
+        "analysis pipelines"
+      ],
+      "ground_truth": null,
+      "expected_sources": [
+        "methodology papers",
+        "open science resources",
+        "example repositories"
+      ]
+    },
+    {
+      "id": 19,
+      "query": "Survey recent progress in few-shot prompting techniques for creative writing assistants.",
+      "category": "few_shot_prompting",
+      "expected_topics": [
+        "prompt engineering",
+        "evaluation metrics",
+        "creative generation",
+        "fine-tuning vs prompting"
+      ],
+      "ground_truth": null,
+      "expected_sources": [
+        "NLP papers",
+        "prompting tutorials",
+        "recent workshop proceedings"
+      ]
+    },
+    {
+      "id": 20,
+      "query": "What evaluation protocols exist for measuring conversational AI helpfulness and safety?",
+      "category": "conversational_evaluation",
+      "expected_topics": [
+        "helpfulness metrics",
+        "safety benchmarks",
+        "human evaluation",
+        "automated metrics"
+      ],
+      "ground_truth": null,
+      "expected_sources": [
+        "evaluation benchmark papers",
+        "conversational AI research",
+        "policy documents"
+      ]
+    }
 ]

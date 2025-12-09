@@ -367,4 +367,3 @@ After creating the plan, end your response with "PLAN COMPLETE"."""
                         metadata["search_queries"].append(query_part)
         
         return metadata
-

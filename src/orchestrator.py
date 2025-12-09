@@ -581,4 +581,3 @@ Sequential Research Workflow:
                         value = value[:100] + "..."
                     summary += f"   - {key}: {value}\n"
         return summary
-

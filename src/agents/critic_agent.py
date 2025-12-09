@@ -384,4 +384,3 @@ End with either:
             metadata["overall_score"] = sum(scores) / len(scores)
         
         return metadata
-

@@ -440,4 +440,3 @@ End with "RESEARCH COMPLETE" when done."""
                     metadata["papers"].append(line.strip())
         
         return metadata
-

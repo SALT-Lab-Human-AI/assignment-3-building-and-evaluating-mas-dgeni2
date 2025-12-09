@@ -471,4 +471,3 @@ End with "DRAFT COMPLETE" when finished."""
         draft += references_section + "\n\nDRAFT COMPLETE"
         
         return draft
-
