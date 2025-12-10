@@ -96,13 +96,17 @@ class SystemEvaluator:
 
         # Evaluate each query
         for i, test_case in enumerate(test_queries, 1):
-            self.logger.info(f"Evaluating query {i}/{len(test_queries)}")
+            query_text = test_case.get("query", "")[:60]
+            print(f"\n[{i}/{len(test_queries)}] Processing: {query_text}...")
+            self.logger.info(f"Evaluating query {i}/{len(test_queries)}: {query_text}")
 
             try:
                 result = await self._evaluate_query(test_case)
                 self.results.append(result)
+                print(f"[{i}/{len(test_queries)}] ✓ Completed")
             except Exception as e:
-                self.logger.error(f"Error evaluating query {i}: {e}")
+                print(f"[{i}/{len(test_queries)}] ✗ Error: {str(e)[:100]}")
+                self.logger.error(f"Error evaluating query {i}: {e}", exc_info=True)
                 self.results.append({
                     "query": test_case.get("query", ""),
                     "error": str(e)
@@ -135,8 +139,18 @@ class SystemEvaluator:
         # Run through orchestrator if available
         if self.orchestrator:
             try:
+                print(f"  → Running through orchestrator...")
                 # Call orchestrator's process_query method (synchronous)
-                response_data = self.orchestrator.process_query(query)
+                # Run in executor to avoid blocking the async event loop
+                import concurrent.futures
+                loop = asyncio.get_event_loop()
+                with concurrent.futures.ThreadPoolExecutor() as executor:
+                    response_data = await loop.run_in_executor(
+                        executor, 
+                        self.orchestrator.process_query, 
+                        query
+                    )
+                print(f"  → Orchestrator completed")
                 
                 # Extract response and metadata
                 if isinstance(response_data, dict):
@@ -175,12 +189,14 @@ class SystemEvaluator:
             }
 
         # Evaluate response using LLM-as-a-Judge
+        print(f"  → Evaluating with LLM-as-a-Judge...")
         evaluation = await self.judge.evaluate(
             query=query,
             response=response_data.get("response", ""),
             sources=response_data.get("metadata", {}).get("sources", []),
             ground_truth=ground_truth
         )
+        print(f"  → Judge score: {evaluation.get('overall_score', 0.0):.3f}")
 
         return {
             "query": query,

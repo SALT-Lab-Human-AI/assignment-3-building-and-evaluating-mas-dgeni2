@@ -114,7 +114,7 @@ class Orchestrator:
             "response": f"Error: Query processing timed out after {self.timeout_seconds} seconds.",
             "citations": [],
             "metadata": {"error": "timeout", "elapsed": elapsed, "iteration": self.current_state.get("iteration", 0)},
-            "traces": self.workflow_traces,
+            "traces": self.workflow_trace,
             "status": "error"
         }
     def process_query(self, query: str) -> Dict[str, Any]:
@@ -182,6 +182,10 @@ class Orchestrator:
             elapsed_time = time.time() - self.start_time
             # Get final response
             final_response = final_result.get("response", "")
+            # Validate response is not empty
+            if not final_response or not final_response.strip():
+                self.logger.warning("Final response is empty, using error message")
+                final_response = "Error: The system was unable to generate a response. This may be due to API rate limits or processing errors."
             # Safety check: Validate output
             safety_violation = False
             safety_metadata = {}
@@ -243,7 +247,7 @@ class Orchestrator:
                 "response": f"Error: Query processing timed out after {self.timeout_seconds} seconds.",
                 "citations": [],
                 "metadata": {"error": "timeout", "elapsed": elapsed},
-                "traces": self.workflow_traces
+                "traces": self.workflow_trace
             }
         self.logger.info("=== PLANNING PHASE ===")
         self._add_trace("planning", "Starting planning phase", {"query": query})
@@ -335,7 +339,7 @@ class Orchestrator:
                     "response": f"Error: Query processing timed out after {self.timeout_seconds} seconds.",
                     "citations": [],
                     "metadata": {"error": "timeout", "elapsed": elapsed, "iteration": iteration + 1},
-                    "traces": self.workflow_traces
+                    "traces": self.workflow_trace
                 }
             # Writing phase
             self.logger.info(f"Writing iteration {iteration + 1}")

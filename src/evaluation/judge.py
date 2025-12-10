@@ -434,7 +434,7 @@ IMPORTANT: Your response must be valid JSON. Use this exact format:
 
     async def _call_judge_llm(self, prompt: str) -> str:
         """
-        Call LLM API to get judgment.
+        Call LLM API to get judgment with retry logic for rate limits.
         Uses model configuration from config.yaml (models.judge section).
         """
         if not self.client:
@@ -442,8 +442,15 @@ IMPORTANT: Your response must be valid JSON. Use this exact format:
                 f"LLM client not initialized. Check API keys for provider: {self.provider}"
             )
         
+        import asyncio
+        import time
+        
+        max_retries = 3
+        base_delay = 2.0  # Base delay in seconds
+        
+        for attempt in range(max_retries):
         try:
-            self.logger.debug(f"Calling {self.provider} API with model: {self.model_name}")
+                self.logger.debug(f"Calling {self.provider} API with model: {self.model_name} (attempt {attempt + 1}/{max_retries})")
             
             # Call LLM API with fallback support
             try:
@@ -464,14 +471,49 @@ IMPORTANT: Your response must be valid JSON. Use this exact format:
                 )
                 
                 response = chat_completion.choices[0].message.content
+                    self.logger.debug(f"Received response: {response[:100]}...")
+                    return response
+                    
             except Exception as e:
                 error_msg = str(e)
+                    error_repr = repr(e)
+                    
+                    # Check for rate limit errors (429)
+                    is_rate_limit = (
+                        "429" in error_msg or
+                        "rate limit" in error_msg.lower() or
+                        "rate_limit" in error_repr.lower() or
+                        "tokens per day" in error_msg.lower()
+                    )
+                    
                 # Check if it's a connection error that might benefit from fallback
                 is_connection_error = any(keyword in error_msg.lower() for keyword in [
                     "ssl", "tls", "connection error", "connect", "timeout"
                 ])
                 
-                if is_connection_error:
+                    if is_rate_limit:
+                        # Calculate exponential backoff delay
+                        delay = base_delay * (2 ** attempt)
+                        # Try to extract wait time from error message
+                        import re
+                        wait_match = re.search(r'(\d+)m(\d+\.?\d*)s', error_msg)
+                        if wait_match:
+                            minutes = int(wait_match.group(1))
+                            seconds = float(wait_match.group(2))
+                            delay = minutes * 60 + seconds + 5  # Add 5 seconds buffer
+                        
+                        if attempt < max_retries - 1:
+                            self.logger.warning(
+                                f"Rate limit hit (attempt {attempt + 1}/{max_retries}). "
+                                f"Waiting {delay:.1f}s before retry..."
+                            )
+                            await asyncio.sleep(delay)
+                            continue
+                        else:
+                            self.logger.error(f"Rate limit exceeded after {max_retries} attempts")
+                            raise RuntimeError(f"Rate limit exceeded: {error_msg[:200]}")
+                    
+                    elif is_connection_error:
                     self.logger.warning(f"Connection error with {self.provider}: {error_msg}")
                     self.logger.info("Attempting fallback to other providers...")
                     
@@ -495,19 +537,34 @@ IMPORTANT: Your response must be valid JSON. Use this exact format:
                         )
                         self.logger.info(f"Successfully used fallback provider: {self.provider}")
                         response = chat_completion.choices[0].message.content
+                            return response
                     except Exception as fallback_error:
                         self.logger.error(f"All providers failed. Fallback error: {fallback_error}")
+                            if attempt < max_retries - 1:
+                                delay = base_delay * (2 ** attempt)
+                                await asyncio.sleep(delay)
+                                continue
+                            raise
+                    else:
+                        # Non-connection, non-rate-limit error
+                        if attempt < max_retries - 1:
+                            delay = base_delay * (2 ** attempt)
+                            self.logger.warning(f"Error (attempt {attempt + 1}/{max_retries}): {error_msg[:200]}. Retrying in {delay:.1f}s...")
+                            await asyncio.sleep(delay)
+                            continue
                         raise
-                else:
-                    # Non-connection error, just raise it
+                        
+            except Exception as e:
+                if attempt == max_retries - 1:
+                    self.logger.error(f"Error calling {self.provider} API after {max_retries} attempts: {e}", exc_info=True)
                     raise
-            self.logger.debug(f"Received response: {response[:100]}...")
-            
-            return response
-            
-        except Exception as e:
-            self.logger.error(f"Error calling {self.provider} API: {e}", exc_info=True)
-            raise
+                else:
+                    delay = base_delay * (2 ** attempt)
+                    self.logger.warning(f"Error on attempt {attempt + 1}: {str(e)[:200]}. Retrying in {delay:.1f}s...")
+                    await asyncio.sleep(delay)
+        
+        # Should not reach here, but just in case
+        raise RuntimeError(f"Failed to get response after {max_retries} attempts")
 
     def _parse_judgment(self, judgment: str) -> tuple:
         """

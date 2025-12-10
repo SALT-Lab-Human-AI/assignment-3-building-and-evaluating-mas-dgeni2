@@ -272,6 +272,158 @@ This will:
 - Evaluate outputs using LLM-as-a-Judge
 - Generate report in `outputs/`
 
+## Demo and Examples
+
+### Web UI Demo
+
+The system includes a working Streamlit web interface. To see it in action:
+
+```bash
+python main.py --mode web
+```
+
+**Demo Features:**
+- Interactive query input
+- Real-time agent workflow visualization
+- Display of agent traces showing each agent's actions
+- Citations and sources with links
+- Safety event indicators when content is blocked/sanitized
+- Query history and statistics
+
+**Screenshot/Demo Video**: See `docs/demo_screenshot.png` (if available) or run the web interface locally to see the full demo.
+
+### Single Command End-to-End Example
+
+Run a complete end-to-end example with agents communicating and producing a final synthesis:
+
+```bash
+python main.py --mode sequential
+```
+
+This command:
+1. Initializes all agents (Planner, Researcher, Writer, Critic)
+2. Processes a sample query through the full workflow
+3. Displays the final synthesized answer with citations
+4. Shows the complete workflow trace
+5. Outputs metadata including sources, citations, and timing
+
+**Expected Output**: The command will display:
+- Workflow visualization
+- Query processing progress
+- Final response with inline citations
+- List of sources used
+- Workflow trace showing agent interactions
+- Metadata (iterations, sources count, elapsed time)
+
+### Sample Session Export
+
+The system can export full session data in JSON format. Example session exports are available in `outputs/sample_sessions/` (created after running queries).
+
+**Session JSON Structure**:
+```json
+{
+  "query": "What are the key principles of explainable AI?",
+  "response": "...",
+  "citations": ["...", "..."],
+  "sources": [...],
+  "workflow_trace": [...],
+  "metadata": {
+    "iterations": 2,
+    "num_sources": 8,
+    "elapsed_time": 45.2,
+    "safety_violation": false
+  }
+}
+```
+
+### Final Synthesized Answers
+
+Example synthesized answers with inline citations are saved in `outputs/responses/` after running queries. These include:
+- Full response text with inline citations (e.g., [1], [2])
+- Separate reference list in APA format
+- Source metadata (titles, URLs, authors)
+- Markdown format for easy reading
+
+**Example Output Location**: `outputs/responses/response_YYYYMMDD_HHMMSS.md`
+
+### LLM-as-a-Judge Results
+
+Evaluation results are displayed in the web UI and saved to `outputs/` after running evaluation.
+
+**Viewing Judge Results**:
+
+1. **In Web UI**: After running a query, enable "Show Evaluation" to see judge scores for that query
+2. **Full Evaluation Report**: Run `python main.py --mode evaluate` to generate a complete evaluation report
+
+**Evaluation Output Files**:
+- `outputs/evaluation_YYYYMMDD_HHMMSS.json` - Detailed results for all queries
+- `outputs/evaluation_summary_YYYYMMDD_HHMMSS.txt` - Summary statistics
+
+**Judge Results Include**:
+- Overall score (0.0-1.0)
+- Scores by criterion (relevance, evidence_quality, factual_accuracy, safety_compliance, clarity)
+- Detailed reasoning for each score
+- Raw judge prompts and outputs (in detailed JSON)
+
+**Example Judge Output** (from `outputs/evaluation_YYYYMMDD_HHMMSS.json`):
+```json
+{
+  "query": "What are the key principles of explainable AI?",
+  "evaluation": {
+    "overall_score": 0.91,
+    "criterion_scores": {
+      "relevance": {
+        "score": 0.95,
+        "reasoning": "Response directly addresses all aspects..."
+      },
+      "evidence_quality": {
+        "score": 0.92,
+        "reasoning": "High-quality sources with proper citations..."
+      }
+    }
+  }
+}
+```
+
+### Guardrail Functionality
+
+The system indicates when content is refused or sanitized through multiple channels:
+
+**In Web UI**:
+- ⚠️ Safety Alert banner appears when content is blocked
+- Shows violation category (harmful_content, personal_attacks, misinformation, off_topic_queries)
+- Displays severity level (high, medium, low)
+- Safety event log shows all safety checks
+
+**In CLI**:
+- Warning messages when violations are detected
+- Safety event statistics via `safety` command
+
+**Safety Log Files**:
+- `logs/safety_events.log` - All safety events with timestamps
+- JSON format for easy parsing
+
+**Policy Categories Triggered**:
+1. **harmful_content**: Violence, self-harm, dangerous instructions
+2. **personal_attacks**: Toxic language, harassment
+3. **misinformation**: Off-topic queries, potential misinformation
+4. **off_topic_queries**: Queries unrelated to research topic (if enabled)
+
+**Example Safety Event**:
+```json
+{
+  "timestamp": "2024-01-15T10:30:00",
+  "type": "input",
+  "safe": false,
+  "violations": [{
+    "category": "harmful_content",
+    "severity": "high",
+    "reason": "Detected dangerous instructions"
+  }],
+  "action": "refuse"
+}
+```
+
 ## Testing
 
 Run tests (if you create them):
@@ -279,6 +431,35 @@ Run tests (if you create them):
 ```bash
 pytest tests/
 ```
+
+## Reproducing Results
+
+To reproduce the results reported in the technical report:
+
+1. **Setup**: Follow the setup instructions above to install dependencies and configure API keys
+
+2. **Run Evaluation**:
+   ```bash
+   python main.py --mode evaluate
+   ```
+   This will process all 20 test queries from `data/example_queries.json` and generate evaluation results.
+
+3. **View Results**: Check `outputs/evaluation_*.json` and `outputs/evaluation_summary_*.txt` for detailed results
+
+4. **Run Individual Queries**: Use the web UI or CLI to test specific queries:
+   ```bash
+   python main.py --mode web
+   # OR
+   python main.py --mode cli
+   ```
+
+5. **Expected Results**: 
+   - Average overall score: ~0.78
+   - Success rate: ~95%
+   - Safety compliance: ~0.95
+   - See `report.md` for detailed analysis
+
+**Note**: Results may vary slightly due to LLM non-determinism. Run multiple times and average for more stable metrics.
 
 ## Resources
 
