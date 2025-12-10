@@ -11,6 +11,13 @@ import os
 import logging
 import asyncio
 
+# Try to import nest_asyncio for nested event loop support
+try:
+    import nest_asyncio
+    nest_asyncio.apply()
+except ImportError:
+    pass  # nest_asyncio not available, will handle differently
+
 
 class WebSearchTool:
     """
@@ -225,7 +232,30 @@ def web_search(query: str, provider: str = "tavily", max_results: int = 5) -> st
         Formatted string with search results
     """
     tool = WebSearchTool(provider=provider, max_results=max_results)
-    results = asyncio.run(tool.search(query))
+    
+    # Handle both sync and async contexts
+    try:
+        # Check if we're in an async context (event loop is running)
+        loop = asyncio.get_running_loop()
+        # We're in an async context - use the existing loop
+        # Create a new event loop in a thread to avoid nesting issues
+        import concurrent.futures
+        import threading
+        
+        def run_in_thread():
+            new_loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(new_loop)
+            try:
+                return new_loop.run_until_complete(tool.search(query))
+            finally:
+                new_loop.close()
+        
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            future = executor.submit(run_in_thread)
+            results = future.result(timeout=30)
+    except RuntimeError:
+        # No event loop running - safe to use asyncio.run()
+        results = asyncio.run(tool.search(query))
     
     if not results:
         return "No search results found."

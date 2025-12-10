@@ -37,3 +37,4 @@ pre-commit
 detect-secrets
 gitleaks
 bandit
+httpx
